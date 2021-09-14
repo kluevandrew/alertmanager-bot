@@ -15,7 +15,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/alecthomas/kong"
+	env "github.com/caarlos0/env/v6"
 	"github.com/docker/libkv/store"
 	"github.com/docker/libkv/store/boltdb"
 	"github.com/docker/libkv/store/consul"
@@ -52,48 +52,34 @@ var (
 )
 
 var cli struct {
-	AlertmanagerURL *url.URL `name:"alertmanager.url" default:"http://localhost:9093/" help:"The URL that's used to connect to the alertmanager"`
-	ListenAddr      string   `name:"listen.addr" default:"0.0.0.0:8080" help:"The address the alertmanager-bot listens on for incoming webhooks"`
-	LogJSON         bool     `name:"log.json" default:"false" help:"Tell the application to log json and not key value pairs"`
-	LogLevel        string   `name:"log.level" default:"info" enum:"error,warn,info,debug" help:"The log level to use for filtering logs"`
-	TemplatePaths   []string `name:"template.paths" default:"/templates/default.tmpl" help:"The paths to the template"`
+	AlertmanagerURL string   `env:"ALERTMANAGER_URL" envDefault:"http://localhost:9093/" help:"The URL that's used to connect to the alertmanager"`
+	ListenAddr      string   `env:"LISTEN_ADDR" envDefault:"0.0.0.0:8080" help:"The address the alertmanager-bot listens on for incoming webhooks"`
+	LogJSON         bool     `env:"LOG_JSON" envDefault:"false" help:"Tell the application to log json and not key value pairs"`
+	LogLevel        string   `env:"LOG_LEVEL" envDefault:"info" enum:"error,warn,info,debug" help:"The log level to use for filtering logs"`
+	TemplatePaths   []string `env:"TEMPLATE_PATHS" envDefault:"/templates/default.tmpl" help:"The paths to the template"`
 
-	cliTelegram
+	TelegramAdmins []int  `required:"true" env:"TELEGRAM_ADMIN" help:"The ID of the initial Telegram Admin"`
+	TelegramToken  string `required:"true" env:"TELEGRAM_TOKEN" help:"The token used to connect with Telegram"`
 
-	Store       string `required:"true" name:"store" enum:"bolt,consul,etcd" help:"The store to use"`
-	StorePrefix string `name:"storeKeyPrefix" default:"telegram/chats" help:"Prefix for store keys"`
-	cliBolt
-	cliConsul
-	cliEtcd
-}
+	Store       string `env:"STORE" required:"true"  enum:"bolt,consul,etcd" help:"The store to use"`
+	StorePrefix string `env:"STORE_KEY_PREFIX" envDefault:"telegram/chats" help:"Prefix for store keys"`
 
-type cliBolt struct {
-	Path string `name:"bolt.path" type:"path" default:"/tmp/bot.db" help:"The path to the file where bolt persists its data"`
-}
+	EtcdURL                   string `env:"ETCD_URL" default:"localhost:2379" help:"The URL that's used to connect to the etcd store"`
+	EtcdTLSInsecure           bool   `env:"ETCD_TLS_INSECURE" default:"false" help:"Use TLS or not"`
+	EtcdTLSInsecureSkipVerify bool   `env:"ETCD_TLS_INSECURE_SKIP_VERIFY" default:"false" help:"Skip server certificates verification"`
+	EtcdTLSCert               string `env:"ETCD_TLS_CERT" type:"path" help:"Path to the TLS cert file"`
+	EtcdTLSKey                string `env:"ETCD_TLS_KEY" type:"path" help:"Path to the TLS key file"`
+	EtcdTLSCA                 string `env:"ETCD_TLS_CA" type:"path" help:"Path to the TLS trusted CA cert file"`
 
-type cliConsul struct {
-	URL *url.URL `name:"consul.url" default:"localhost:8500" help:"The URL that's used to connect to the consul store"`
-}
+	ConsulURL string `env:"CONSUL_URL" envDefault:"localhost:8500" help:"The URL that's used to connect to the consul store"`
 
-type cliEtcd struct {
-	URL                   *url.URL `name:"etcd.url" default:"localhost:2379" help:"The URL that's used to connect to the etcd store"`
-	TLSInsecure           bool     `name:"etcd.tls.insecure" default:"false" help:"Use TLS or not"`
-	TLSInsecureSkipVerify bool     `name:"etcd.tls.insecureSkipVerify" default:"false" help:"Skip server certificates verification"`
-	TLSCert               string   `name:"etcd.tls.cert" type:"path" help:"Path to the TLS cert file"`
-	TLSKey                string   `name:"etcd.tls.key" type:"path" help:"Path to the TLS key file"`
-	TLSCA                 string   `name:"etcd.tls.ca" type:"path" help:"Path to the TLS trusted CA cert file"`
-}
-
-type cliTelegram struct {
-	Admins []int  `required:"true" name:"telegram.admin" help:"The ID of the initial Telegram Admin"`
-	Token  string `required:"true" name:"telegram.token" env:"TELEGRAM_TOKEN" help:"The token used to connect with Telegram"`
+	BoltPath string `env:"BOLT_PATH" type:"path" envDefault:"/tmp/bot.db" help:"The path to the file where bolt persists its data"`
 }
 
 func main() {
-	_ = kong.Parse(&cli,
-		kong.Name("alertmanager-bot"),
-	)
-
+	if err := env.Parse(&cli); err != nil {
+		panic(fmt.Sprintf("Error parse env: %+v\n", err))
+	}
 	var err error
 
 	levelFilter := map[string]level.Option{
@@ -120,9 +106,15 @@ func main() {
 		prometheus.NewProcessCollector(prometheus.ProcessCollectorOpts{}),
 	)
 
+	alertmanagerURL, err := url.Parse(cli.AlertmanagerURL)
+	if err != nil {
+		level.Error(logger).Log("msg", "failed to parse alertmanager url", "err", err)
+		os.Exit(1)
+	}
+
 	var am *alertmanager.Client
 	{
-		client, err := alertmanager.NewClient(cli.AlertmanagerURL)
+		client, err := alertmanager.NewClient(alertmanagerURL)
 		if err != nil {
 			level.Error(logger).Log("msg", "failed to create alertmanager client", "err", err)
 			os.Exit(1)
@@ -134,13 +126,13 @@ func main() {
 	{
 		switch strings.ToLower(cli.Store) {
 		case storeBolt:
-			kvStore, err = boltdb.New([]string{cli.cliBolt.Path}, &store.Config{Bucket: "alertmanager"})
+			kvStore, err = boltdb.New([]string{cli.BoltPath}, &store.Config{Bucket: "alertmanager"})
 			if err != nil {
 				level.Error(logger).Log("msg", "failed to create bolt store backend", "err", err)
 				os.Exit(1)
 			}
 		case storeConsul:
-			kvStore, err = consul.New([]string{cli.cliConsul.URL.String()}, nil)
+			kvStore, err = consul.New([]string{cli.ConsulURL}, nil)
 			if err != nil {
 				level.Error(logger).Log("msg", "failed to create consul store backend", "err", err)
 				os.Exit(1)
@@ -148,8 +140,8 @@ func main() {
 		case storeEtcd:
 			tlsConfig := &tls.Config{}
 
-			if cli.cliEtcd.TLSCert != "" {
-				cert, err := tls.LoadX509KeyPair(cli.cliEtcd.TLSCert, cli.cliEtcd.TLSKey)
+			if cli.EtcdTLSCert != "" {
+				cert, err := tls.LoadX509KeyPair(cli.EtcdTLSCert, cli.EtcdTLSKey)
 				if err != nil {
 					level.Error(logger).Log("msg", "failed to create etcd store backend, could not load certificates", "err", err)
 					os.Exit(1)
@@ -157,8 +149,8 @@ func main() {
 				tlsConfig.Certificates = []tls.Certificate{cert}
 			}
 
-			if cli.cliEtcd.TLSCA != "" {
-				caCert, err := ioutil.ReadFile(cli.cliEtcd.TLSCA)
+			if cli.EtcdTLSCA != "" {
+				caCert, err := ioutil.ReadFile(cli.EtcdTLSCA)
 				if err != nil {
 					level.Error(logger).Log("msg", "failed to create etcd store backend, could not load ca certificate", "err", err)
 					os.Exit(1)
@@ -169,12 +161,12 @@ func main() {
 				tlsConfig.RootCAs = caCertPool
 			}
 
-			tlsConfig.InsecureSkipVerify = cli.cliEtcd.TLSInsecureSkipVerify
+			tlsConfig.InsecureSkipVerify = cli.EtcdTLSInsecureSkipVerify
 
-			if !cli.cliEtcd.TLSInsecure {
-				kvStore, err = etcd.New([]string{cli.cliEtcd.URL.String()}, &store.Config{TLS: tlsConfig})
+			if !cli.EtcdTLSInsecure {
+				kvStore, err = etcd.New([]string{cli.EtcdURL}, &store.Config{TLS: tlsConfig})
 			} else {
-				kvStore, err = etcd.New([]string{cli.cliEtcd.URL.String()}, nil)
+				kvStore, err = etcd.New([]string{cli.EtcdURL}, nil)
 			}
 
 			if err != nil {
@@ -214,15 +206,15 @@ func main() {
 		}
 
 		bot, err := telegram.NewBot(
-			chats, cli.cliTelegram.Token, cli.cliTelegram.Admins[0],
+			chats, cli.TelegramToken, cli.TelegramAdmins[0],
 			telegram.WithLogger(tlogger),
 			telegram.WithCommandEvent(commandCount),
 			telegram.WithAddr(cli.ListenAddr),
 			telegram.WithAlertmanager(am),
-			telegram.WithTemplates(cli.AlertmanagerURL, cli.TemplatePaths...),
+			telegram.WithTemplates(alertmanagerURL, cli.TemplatePaths...),
 			telegram.WithRevision(Revision),
 			telegram.WithStartTime(StartTime),
-			telegram.WithExtraAdmins(cli.cliTelegram.Admins[1:]...),
+			telegram.WithExtraAdmins(cli.TelegramAdmins[1:]...),
 		)
 		if err != nil {
 			level.Error(tlogger).Log("msg", "failed to create bot", "err", err)

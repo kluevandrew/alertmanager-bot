@@ -11,11 +11,11 @@ require (
 	github.com/Microsoft/go-winio v0.4.16 // indirect
 	github.com/NYTimes/gziphandler v1.1.1 // indirect
 	github.com/OneOfOne/xxhash v1.2.5 // indirect
-	github.com/alecthomas/kong v0.2.15
 	github.com/armon/circbuf v0.0.0-20190214190532-5111143e8da2 // indirect
 	github.com/aws/aws-sdk-go v1.37.15 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/boltdb/bolt v1.3.1 // indirect
+	github.com/caarlos0/env/v6 v6.7.1 // indirect
 	github.com/census-instrumentation/opencensus-proto v0.3.0 // indirect
 	github.com/circonus-labs/circonusllhist v0.1.4 // indirect
 	github.com/cncf/udpa/go v0.0.0-20210210032658-bff43e8824d0 // indirect
