@@ -124,20 +124,6 @@ docker run -d \
 	kluevandrew/alertmanager-bot:latest
 ```
 
-#### ETCD Storage
-
-```bash
-docker run -d \
-	-e 'ALERTMANAGER_URL=http://alertmanager:9093' \
-	-e 'ETCD_URL=localhost:2379' \
-	-e 'STORE=etcd' \
-	-e 'ETCD_TLS_INSECURE=true' \
-	-e 'TELEGRAM_ADMIN=1234567' \
-	-e 'TELEGRAM_TOKEN=XXX' \
-	--name alertmanager-bot \
-	kluevandrew/alertmanager-bot:latest
-```
-
 ### docker-compose:
 
 [embedmd]:# (deployments/examples/docker-compose.yaml)
@@ -283,25 +269,19 @@ If you prefer using configuration management systems (like Ansible) you might be
 
 ### Configuration
 
-| ENV Variable                  | Required | Default                 | Description                                                                                                                                                                                                                          |   |   |   |
-|-------------------------------|----------|-------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---|---|---|
-| ALERTMANAGER_URL              |          | http://localhost:9093   | Address of the alertmanager                                                                                                                                                                                                          |   |   |   |
-| BOLT_PATH                     |          | /tmp/bot.db             | Path on disk to the file where the boltdb is stored                                                                                                                                                                                  |   |   |   |
-| CONSUL_URL                    |          | localhost:8500          | The URL to use to connect with Consul                                                                                                                                                                                                |   |   |   |
-| LISTEN_ADDR                   |          | 0.0.0.0:8080            | Address that the bot listens for webhooks                                                                                                                                                                                            |   |   |   |
-| STORE                         | ✓        |                         | The type of the store to use, choose from bolt (local), consul or etcd (distributed)                                                                                                                                                 |   |   |   |
-| STORE_KEY_PREFIX              |          | telegram/chats          | Key prefix for the store                                                                                                                                                                                                             |   |   |   |
-| ETCD_URL                      |          | localhost:2379          | The URL that's used to connect to the ETCD store                                                                                                                                                                                     |   |   |   |
-| ETCD_TLS_INSECURE             |          | false                   | Use TLS connection to ETCD store or not                                                                                                                                                                                              |   |   |   |
-| ETCD_TLS_INSECURE_SKIP_VERIFY |          |                         | Skip server certificates verification                                                                                                                                                                                                |   |   |   |
-| ETCD_TLS_CERT                 |          |                         | Path to the TLS cert file                                                                                                                                                                                                            |   |   |   |
-| ETCD_TLS_KEY                  |          |                         | Path to the TLS key file                                                                                                                                                                                                             |   |   |   |
-| ETCD_TLS_CACERT               |          |                         | Path to the TLS trusted CA cert file                                                                                                                                                                                                 |   |   |   |
-| LOG_JSON                      |          |                         | Tell the application to log json and not key value pairs                                                                                                                                                                             |   |   |   |
-| LOG_LEVEL                     |          | info                    | The log level to use for filtering logs. Possible values: debug, info, warn, error                                                                                                                                                   |   |   |   |
+| ENV Variable                  | Required | Default                 | Description                                                                                                                                                                                                                      |   |   |   |
+|-------------------------------|----------|-------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---|---|---|
+| ALERTMANAGER_URL              |          | http://localhost:9093   | Address of the alertmanager                                                                                                                                                                                                      |   |   |   |
+| BOLT_PATH                     |          | /tmp/bot.db             | Path on disk to the file where the boltdb is stored                                                                                                                                                                              |   |   |   |
+| CONSUL_URL                    |          | localhost:8500          | The URL to use to connect with Consul                                                                                                                                                                                            |   |   |   |
+| LISTEN_ADDR                   |          | 0.0.0.0:8080            | Address that the bot listens for webhooks                                                                                                                                                                                        |   |   |   |
+| STORE                         | ✓        |                         | The type of the store to use, choose from bolt (local), consul (distributed)                                                                                                                                                 |   |   |   |
+| STORE_KEY_PREFIX              |          | telegram/chats          | Key prefix for the store                                                                                                                                                                                                         |   |   |   |
+| LOG_JSON                      |          |                         | Tell the application to log json and not key value pairs                                                                                                                                                                         |   |   |   |
+| LOG_LEVEL                     |          | info                    | The log level to use for filtering logs. Possible values: debug, info, warn, error                                                                                                                                               |   |   |   |
 | TELEGRAM_ADMIN                | ✓        |                         | The Telegram user id for the admin (not the bot itself, you, the user). The bot will only reply to messages sent from an admin. All other messages are dropped and logged on the bot's console.  Your user id you can get from [@userinfobot](https://t.me/userinfobot). |   |   |   |
-| TELEGRAM_TOKEN                | ✓        |                         | Token you get from [@botfather](https://telegram.me/botfather)                                                                                                                                                                       |   |   |   |
-| TEMPLATE_PATHS                |          | /templates/default.tmpl | Path to custom message templates                                                                                                                                                                                                     |   |   |   |
+| TELEGRAM_TOKEN                | ✓        |                         | Token you get from [@botfather](https://telegram.me/botfather)                                                                                                                                                                   |   |   |   |
+| TEMPLATE_PATHS                |          | /templates/default.tmpl | Path to custom message templates                                                                                                                                                                                                 |   |   |   |
 
 #### Authentication
 

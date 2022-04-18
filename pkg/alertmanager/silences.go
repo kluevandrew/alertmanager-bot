@@ -3,6 +3,7 @@ package alertmanager
 import (
 	"context"
 	"fmt"
+	"github.com/prometheus/alertmanager/pkg/labels"
 	"strings"
 	"time"
 
@@ -19,12 +20,12 @@ func (c *Client) ListSilences(ctx context.Context) ([]*types.Silence, error) {
 
 	silences := make([]*types.Silence, 0, len(getSilences.Payload))
 	for _, s := range getSilences.Payload {
-		var matchers = make([]*types.Matcher, 0, len(s.Matchers))
+		var matchers = make(labels.Matchers, 0, len(s.Matchers))
 		for _, m := range matchers {
-			matchers = append(matchers, &types.Matcher{
-				Name:    m.Name,
-				Value:   m.Value,
-				IsRegex: m.IsRegex,
+			matchers = append(matchers, &labels.Matcher{
+				Name:  m.Name,
+				Value: m.Value,
+				Type:  m.Type,
 			})
 		}
 

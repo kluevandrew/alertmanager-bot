@@ -2,10 +2,7 @@ package main
 
 import (
 	"context"
-	"crypto/tls"
-	"crypto/x509"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"os"
@@ -19,7 +16,6 @@ import (
 	"github.com/docker/libkv/store"
 	"github.com/docker/libkv/store/boltdb"
 	"github.com/docker/libkv/store/consul"
-	"github.com/docker/libkv/store/etcd"
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/metalmatze/alertmanager-bot/pkg/alertmanager"
@@ -32,7 +28,6 @@ import (
 const (
 	storeBolt   = "bolt"
 	storeConsul = "consul"
-	storeEtcd   = "etcd"
 
 	levelDebug = "debug"
 	levelInfo  = "info"
@@ -61,15 +56,8 @@ var cli struct {
 	TelegramAdmins []int  `required:"true" env:"TELEGRAM_ADMIN" help:"The ID of the initial Telegram Admin"`
 	TelegramToken  string `required:"true" env:"TELEGRAM_TOKEN" help:"The token used to connect with Telegram"`
 
-	Store       string `env:"STORE" required:"true"  enum:"bolt,consul,etcd" help:"The store to use"`
+	Store       string `env:"STORE" required:"true"  enum:"bolt,consul" help:"The store to use"`
 	StorePrefix string `env:"STORE_KEY_PREFIX" envDefault:"telegram/chats" help:"Prefix for store keys"`
-
-	EtcdURL                   string `env:"ETCD_URL" default:"localhost:2379" help:"The URL that's used to connect to the etcd store"`
-	EtcdTLSInsecure           bool   `env:"ETCD_TLS_INSECURE" default:"false" help:"Use TLS or not"`
-	EtcdTLSInsecureSkipVerify bool   `env:"ETCD_TLS_INSECURE_SKIP_VERIFY" default:"false" help:"Skip server certificates verification"`
-	EtcdTLSCert               string `env:"ETCD_TLS_CERT" type:"path" help:"Path to the TLS cert file"`
-	EtcdTLSKey                string `env:"ETCD_TLS_KEY" type:"path" help:"Path to the TLS key file"`
-	EtcdTLSCA                 string `env:"ETCD_TLS_CA" type:"path" help:"Path to the TLS trusted CA cert file"`
 
 	ConsulURL string `env:"CONSUL_URL" envDefault:"localhost:8500" help:"The URL that's used to connect to the consul store"`
 
@@ -137,44 +125,8 @@ func main() {
 				level.Error(logger).Log("msg", "failed to create consul store backend", "err", err)
 				os.Exit(1)
 			}
-		case storeEtcd:
-			tlsConfig := &tls.Config{}
-
-			if cli.EtcdTLSCert != "" {
-				cert, err := tls.LoadX509KeyPair(cli.EtcdTLSCert, cli.EtcdTLSKey)
-				if err != nil {
-					level.Error(logger).Log("msg", "failed to create etcd store backend, could not load certificates", "err", err)
-					os.Exit(1)
-				}
-				tlsConfig.Certificates = []tls.Certificate{cert}
-			}
-
-			if cli.EtcdTLSCA != "" {
-				caCert, err := ioutil.ReadFile(cli.EtcdTLSCA)
-				if err != nil {
-					level.Error(logger).Log("msg", "failed to create etcd store backend, could not load ca certificate", "err", err)
-					os.Exit(1)
-				}
-
-				caCertPool := x509.NewCertPool()
-				caCertPool.AppendCertsFromPEM(caCert)
-				tlsConfig.RootCAs = caCertPool
-			}
-
-			tlsConfig.InsecureSkipVerify = cli.EtcdTLSInsecureSkipVerify
-
-			if !cli.EtcdTLSInsecure {
-				kvStore, err = etcd.New([]string{cli.EtcdURL}, &store.Config{TLS: tlsConfig})
-			} else {
-				kvStore, err = etcd.New([]string{cli.EtcdURL}, nil)
-			}
-
-			if err != nil {
-				level.Error(logger).Log("msg", "failed to create etcd store backend", "err", err)
-				os.Exit(1)
-			}
 		default:
-			level.Error(logger).Log("msg", "please provide one of the following supported store backends: bolt, consul, etcd")
+			level.Error(logger).Log("msg", "please provide one of the following supported store backends: bolt, consul")
 			os.Exit(1)
 		}
 	}
